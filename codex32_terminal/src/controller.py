@@ -11,10 +11,13 @@ from model import (
     codex32_to_seed_bytes,
     parse_codex32_share,
     recover_secret_share,
+    VALID_LENGTHS,
 )
 
 
-TOTAL_LEN = 48
+# Supported seed sizes: 128-bit (48 chars) or 256-bit (74 chars)
+LEN_128BIT = 48
+LEN_256BIT = 74
 BASE_PREFIX = "MS1"
 FIRST_BOX = len(BASE_PREFIX) + 1
 CANCELLED = object()
@@ -34,18 +37,18 @@ def _is_backspace(value: str) -> bool:
     return value == "" or value == "<"
 
 
-def collect_codex32_boxes(prefix: str, start_box: int) -> str:
+def collect_codex32_boxes(prefix: str, start_box: int, total_len: int) -> str:
     current = prefix
-    view.display_progress(current, TOTAL_LEN)
+    view.display_progress(current, total_len)
     box_number = start_box
-    while box_number <= TOTAL_LEN:
+    while box_number <= total_len:
         raw = view.get_box_input(box_number)
         ch = _normalize_box_char(raw)
         if _is_backspace(ch):
             if len(current) > len(prefix):
                 current = current[:-1]
                 box_number -= 1
-                view.display_progress(current, TOTAL_LEN)
+                view.display_progress(current, total_len)
             else:
                 view.display_error("Already at the first editable box.")
             continue
@@ -56,7 +59,7 @@ def collect_codex32_boxes(prefix: str, start_box: int) -> str:
             view.display_error("Invalid bech32 character. Use bech32 charset.")
             continue
         current += ch
-        view.display_progress(current, TOTAL_LEN)
+        view.display_progress(current, total_len)
         box_number += 1
     return current
 
@@ -66,10 +69,10 @@ def _display_and_confirm(codex_str: str) -> bool:
     return view.confirm("Submit this codex32 string?")
 
 
-def _collect_share_box(prefix: str, start_box: int, index: int, total: int) -> str | object | None:
+def _collect_share_box(prefix: str, start_box: int, index: int, total: int, total_len: int) -> str | object | None:
     view.display_share_prompt(index, total)
     try:
-        codex_str = collect_codex32_boxes(prefix, start_box)
+        codex_str = collect_codex32_boxes(prefix, start_box, total_len)
     except KeyboardInterrupt:
         view.display_cancelled()
         return CANCELLED
@@ -99,11 +102,19 @@ def _collect_share_full(prefix: str | None, index: int, total: int) -> str | obj
 
 def run(entry_mode: str = "box") -> int:
     view.display_welcome(entry_mode)
+
+    # For box mode, ask user about seed size
+    total_len = LEN_128BIT  # default
+    if entry_mode == "box":
+        seed_size = view.get_seed_size_choice()
+        if seed_size == "256":
+            total_len = LEN_256BIT
+
     while True:
         if entry_mode == "full":
             result = _collect_share_full(BASE_PREFIX, 1, 1)
         else:
-            result = _collect_share_box(BASE_PREFIX, FIRST_BOX, 1, 1)
+            result = _collect_share_box(BASE_PREFIX, FIRST_BOX, 1, 1, total_len)
         if result is CANCELLED:
             return 1
         if result is None:
@@ -142,12 +153,15 @@ def run(entry_mode: str = "box") -> int:
         if first_share.s.isupper():
             prefix = prefix.upper()
 
+        # For subsequent shares, use the same total_len as detected from first share
+        share_total_len = len(first_share.s)
+
         while len(shares) < threshold:
             share_index = len(shares) + 1
             if entry_mode == "full":
                 result = _collect_share_full(prefix, share_index, threshold)
             else:
-                result = _collect_share_box(prefix, len(prefix) + 1, share_index, threshold)
+                result = _collect_share_box(prefix, len(prefix) + 1, share_index, threshold, share_total_len)
             if result is CANCELLED:
                 return 1
             if result is None:

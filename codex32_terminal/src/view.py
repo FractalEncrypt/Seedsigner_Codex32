@@ -6,10 +6,25 @@ from __future__ import annotations
 def display_welcome(entry_mode: str) -> None:
     print("Codex32 S-share entry (MVP)")
     if entry_mode == "full":
-        print("Paste full shares. Ctrl+C cancels.")
+        print("Paste full shares (48 or 74 chars). Ctrl+C cancels.")
     else:
         print("Enter characters box-by-box. Prefix 'MS1' is pre-filled.")
         print("Use Backspace (empty input) or '<' to go back. Ctrl+C cancels.")
+
+
+def get_seed_size_choice() -> str:
+    """Ask user to select seed size for box-by-box entry."""
+    print("\nSelect seed size:")
+    print("  [1] 128-bit (48 characters, 12-word mnemonic)")
+    print("  [2] 256-bit (74 characters, 24-word mnemonic)")
+    while True:
+        choice = input("Enter 1 or 2 [default: 1]: ").strip()
+        if choice == "" or choice == "1":
+            return "128"
+        elif choice == "2":
+            return "256"
+        else:
+            print("Invalid choice. Enter 1 or 2.")
 
 
 def display_progress(current: str, total_len: int) -> None:
@@ -64,9 +79,11 @@ def display_cancelled() -> None:
 
 
 def display_success(seed_bytes: bytes, mnemonic: str, recovered_share: str | None = None) -> None:
-    print("\nCodex32 S-share accepted.")
+    word_count = len(mnemonic.split())
+    bit_size = len(seed_bytes) * 8
+    print(f"\nCodex32 S-share accepted ({bit_size}-bit seed).")
     print(f"Seed (hex): {seed_bytes.hex()}")
     if recovered_share:
         print(f"Recovered S-share: {recovered_share}")
-    print(f"BIP39 mnemonic: {mnemonic}")
+    print(f"BIP39 mnemonic ({word_count} words): {mnemonic}")
     print("Note: This mnemonic is a display encoding of the BIP32 seed; no PBKDF2 is used.")
