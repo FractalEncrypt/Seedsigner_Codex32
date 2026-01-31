@@ -1,0 +1,87 @@
+Codex32 → BIP39 Terminal MVP (based on My_idea.txt)
+
+1) What the docs require (quick eval)
+- wallets.md: The wallet MUST validate the codex32 checksum + header before accepting input. For 128-bit secrets, codex32 strings are 48 chars including the "MS1" prefix. The master seed must be used directly as a BIP32 seed (no PBKDF).
+- bip-0093.mediawiki: The 26 payload chars encode 130 bits; discard the last 2 bits to obtain the 128-bit master seed. The checksum is BCH; any invalid checksum must be rejected. For unshared secrets, share index must be "s". Mixed-case strings are invalid.
+- My_idea.txt: MVP is S-share only (no share recovery), box-by-box entry, checksum validation, then deterministic 12-word BIP39 display.
+
+MVP analysis (simple + battle-tested path)
+- Use python-codex32 for validation and decoding. This is the safest way to ensure header/checksum compliance.
+- Use embit for BIP39 conversion since it’s what SeedSigner uses.
+- IMPORTANT: The 12-word mnemonic is only a display encoding of the 128-bit master seed. It must NOT be used to derive a new seed via BIP39 PBKDF2. The master seed bytes are already the BIP32 seed.
+
+2) MVP scope
+- Accept a single 48-character codex32 “S” share (128-bit master seed).
+- Validate checksum + header (ms1, lowercase/uppercase single-case, share index = s).
+- Convert the 26 payload chars → 130 bits → drop last 2 bits → 128 bits.
+- Output:
+  - 128-bit seed hex (for sanity checks)
+  - 12-word BIP39 mnemonic (deterministic from the 128-bit seed bytes)
+- No error correction, no multi-share recovery (V2 only).
+
+3) Environment setup (Windows / PowerShell)
+- Install Python 3.11+ (or existing Python used by SeedSigner work).
+- Create a venv in the project folder:
+  - python -m venv venv
+  - .\venv\Scripts\Activate.ps1
+- Install dependencies:
+  - pip install codex32 embit
+  - pip freeze > requirements.txt
+
+4) Suggested project structure
+codex32_terminal/
+  src/
+    main.py            # CLI entry point
+    model.py           # validation + conversion
+    view.py            # terminal prompts/output
+    controller.py      # flow control
+  tests/
+    test_vectors.py
+  requirements.txt
+  README.md
+
+Note: Keep model.py pure so it can be reused in SeedSigner later.
+
+5) MVP implementation steps
+Step 1: Validate and decode codex32 (model.py)
+- validate_codex32(codex_str):
+  - Normalize: ensure single-case; lower for decode.
+  - Ensure prefix ms1 and length 48 for MVP.
+  - Use codex32 library decode/validate (inspect API; prefer provided ms32_decode/verify).
+  - Ensure share index == 's'.
+
+Step 2: Convert payload to 128-bit entropy (model.py)
+- Extract payload (26 5-bit values) from decoded data part.
+- Convert 26×5 bits → 130-bit stream (MSB-first).
+- Drop last 2 bits → 128-bit stream.
+- Convert to 16-byte array.
+
+Step 3: Convert entropy to BIP39 mnemonic (model.py)
+- Use embit.bip39.mnemonic_from_bytes(entropy_bytes) to get 12 words.
+
+Step 4: Terminal UI (view.py/controller.py)
+- Prompt for 48 characters in “boxes”; prefill “MS1” by default.
+- Optionally validate bech32 charset on each entry (basic guardrail).
+- On completion, validate checksum; if invalid, show error and restart.
+
+6) MVP testing
+- Use BIP-93 test vector 1:
+  - codex32: ms10testsxxxxxxxxxxxxxxxxxxxxxxxxxx4nzvca9cmczlw
+  - expected seed hex: 318c6318c6318c6318c6318c6318c631
+  - derive expected 12-word mnemonic from this hex with embit and assert equality.
+- Use test vectors 2 and 3 recovered S-shares to ensure decode/convert works.
+- Add negative tests using the “Invalid test vectors” list from BIP-93.
+
+7) V2 roadmap (post-MVP)
+- Error correction:
+  - Support “?” for erasures; use codex32 library correction helpers if available.
+  - Must confirm candidate fixes with user (wallets.md requirement).
+- Share recovery:
+  - If share index ≠ s, parse threshold k from box 4.
+  - Collect k shares; validate each; use codex32 interpolation to recover S-share.
+  - Reuse the MVP conversion pipeline.
+- Optional: support 74-character (256-bit) secrets.
+
+8) Integration notes for SeedSigner (future)
+- Keep model/controller separate from UI; only replace view in SeedSigner.
+- The “BIP39 words” here are for display/transfer only. When integrating, the BIP32 seed must come from the raw 128-bit bytes.
