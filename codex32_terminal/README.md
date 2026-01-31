@@ -14,7 +14,18 @@ This folder contains a terminal-based MVP for validating Codex32 shares, recover
 
 ⚠️ Not an ECW yet (no error correction). The codex32 Python library does **not** provide substitution/erasure correction, so this tool does not attempt it. Error-correction should be implemented separately before advertising ECW behavior.
 
-## Setup (Windows PowerShell)
+## Setup
+
+### macOS / Linux
+
+```bash
+cd codex32_terminal
+python3 -m venv venv
+source venv/bin/activate
+pip install codex32 embit
+```
+
+### Windows PowerShell
 
 From the repo root:
 
@@ -30,6 +41,13 @@ pip freeze > .\codex32_terminal\requirements.txt
 
 ### Box-by-box entry (default)
 
+**macOS / Linux:**
+```bash
+source venv/bin/activate
+python src/main.py
+```
+
+**Windows PowerShell:**
 ```powershell
 .\codex32_terminal\venv\Scripts\Activate.ps1 ; python .\codex32_terminal\src\main.py
 ```
@@ -43,11 +61,69 @@ Features:
 
 ### Full-share paste mode
 
+**macOS / Linux:**
+```bash
+source venv/bin/activate
+python src/main.py --full
+```
+
+**Windows PowerShell:**
 ```powershell
 .\codex32_terminal\venv\Scripts\Activate.ps1 ; python .\codex32_terminal\src\main.py --full
 ```
 
 Paste full shares in sequence. For `k-of-n` shares, the tool will ask for additional shares until the threshold is met.
+
+## Run Tests
+
+Run all test files:
+
+**macOS / Linux:**
+```bash
+cd codex32_terminal
+source venv/bin/activate
+python tests/test_vectors.py
+python tests/test_share_recovery.py
+python tests/test_validation.py
+python tests/test_invalid_vectors.py
+```
+
+**Windows PowerShell:**
+```powershell
+.\codex32_terminal\venv\Scripts\Activate.ps1
+python tests/test_vectors.py
+python tests/test_share_recovery.py
+python tests/test_validation.py
+python tests/test_invalid_vectors.py
+```
+
+### Expected output
+
+When all tests pass, you should see:
+
+```
+vector2: seed OK -> spice afford liquid stool forest agent choose draw clinic cram obvious enough
+vector3: seed OK -> zoo ivory industry jar praise service talk skirt during october lounge absurd
+test_vector2_share_recovery: PASS
+test_vector3_share_recovery: PASS
+test_vector3_different_share_combination: PASS
+
+All share recovery tests passed!
+test_invalid_checksum_rejected: PASS
+test_wrong_length_rejected: PASS
+test_empty_input_rejected: PASS
+test_non_s_share_rejected_for_s_share_validation: PASS
+test_sanitize_input: PASS
+test_valid_share_accepted: PASS
+test_case_insensitive_but_consistent: PASS
+
+All validation tests passed!
+test_invalid_checksum_vectors: PASS (3 vectors rejected)
+test_bip93_invalid_vectors: PASS (4 vectors rejected)
+test_corrupted_single_char: PASS (7 corruptions detected)
+
+All invalid vector tests passed!
+```
 
 ## Test vectors
 
@@ -95,6 +171,15 @@ Expected output:
 
 - `tests/test_vectors.py`
   - Manual harness for BIP-93 vectors 2/3
+
+- `tests/test_share_recovery.py`
+  - Tests 2-of-n and 3-of-n share recovery with BIP-93 vectors
+
+- `tests/test_validation.py`
+  - Tests input validation (checksum, length, empty input, sanitization)
+
+- `tests/test_invalid_vectors.py`
+  - Tests rejection of BIP-93 invalid test vectors
 
 ### Implementation rationale
 
