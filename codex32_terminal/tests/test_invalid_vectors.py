@@ -78,7 +78,9 @@ def test_corrupted_single_char():
     """Test that single character corruption is detected."""
     valid = "MS12NAMES6XQGUZTTXKEQNJSJZV4JV3NZ5K3KWGSPHUH6EVW"
 
-    # Test corruption at various positions
+    # Test corruption at key positions:
+    # 0=HRP start, 5=threshold, 10=identifier, 20=payload middle,
+    # 30=payload, 40=near checksum, 47=last char (checksum)
     positions_to_test = [0, 5, 10, 20, 30, 40, 47]
     corruptions_detected = 0
 

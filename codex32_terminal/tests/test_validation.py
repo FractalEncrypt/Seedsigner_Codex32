@@ -12,7 +12,6 @@ from model import (
     Codex32InputError,
     parse_codex32_share,
     validate_codex32_s_share,
-    codex32_to_seed_bytes,
     sanitize_codex32_input,
 )
 

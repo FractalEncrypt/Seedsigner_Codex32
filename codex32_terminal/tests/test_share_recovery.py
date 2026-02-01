@@ -9,6 +9,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
 from model import (
+    Codex32InputError,
     parse_codex32_share,
     recover_secret_share,
     codex32_to_seed_bytes,
@@ -126,8 +127,6 @@ def test_duplicate_share_rejected():
     If the same share is provided twice, interpolation should fail
     because we need k distinct shares.
     """
-    from model import Codex32InputError
-
     # Same share twice
     shares = [
         parse_codex32_share(VECTOR2_SHARES["A"]),
@@ -145,8 +144,6 @@ def test_duplicate_share_rejected():
 
 def test_empty_share_list_rejected():
     """Test that empty share list is rejected."""
-    from model import Codex32InputError
-
     try:
         recover_secret_share([])
         raise AssertionError("Should have rejected empty share list")
@@ -161,8 +158,6 @@ def test_insufficient_shares_rejected():
 
     For k=2, we need at least 2 shares.
     """
-    from model import Codex32InputError
-
     # Only 1 share when k=2 is required
     shares = [
         parse_codex32_share(VECTOR2_SHARES["A"]),
@@ -182,8 +177,6 @@ def test_mismatched_identifiers_rejected():
 
     All shares must have the same identifier (e.g., 'NAME' or 'cash').
     """
-    from model import Codex32InputError
-
     # Mix shares from Vector 2 (NAME) and Vector 3 (cash)
     shares = [
         parse_codex32_share(VECTOR2_SHARES["A"]),  # NAME
@@ -199,21 +192,22 @@ def test_mismatched_identifiers_rejected():
     print("test_mismatched_identifiers_rejected: PASS")
 
 
-def test_extra_shares_still_works():
-    """Test that providing more than threshold shares still works.
+def test_exact_threshold_shares_works():
+    """Test that providing exactly threshold shares works.
 
-    For k=2, providing 3 consistent shares should still recover correctly.
+    For k=3 (Vector 3), providing exactly 3 shares should recover correctly.
+    This verifies the minimum threshold case.
     """
-    # Generate a third share from Vector 2 by using the secret
-    # Actually, we only have A and C from Vector 2, so we can't test this easily
-    # without generating additional shares. Skip for now.
-    #
-    # This test would require either:
-    # 1. Having a third test vector share, or
-    # 2. Generating shares from the known S-share
-
-    # For now, just verify k shares works (already covered in other tests)
-    print("test_extra_shares_still_works: SKIP (would need additional test vectors)")
+    # Vector 3 has exactly 3 shares for k=3
+    shares = [
+        parse_codex32_share(VECTOR3_SHARES["A"]),
+        parse_codex32_share(VECTOR3_SHARES["C"]),
+        parse_codex32_share(VECTOR3_SHARES["D"]),
+    ]
+    secret = recover_secret_share(shares)
+    assert secret is not None
+    assert secret.s.lower() == VECTOR3_EXPECTED["s_share"].lower()
+    print("test_exact_threshold_shares_works: PASS (3-of-3 verified)")
 
 
 def main():
@@ -224,7 +218,7 @@ def main():
     test_empty_share_list_rejected()
     test_insufficient_shares_rejected()
     test_mismatched_identifiers_rejected()
-    test_extra_shares_still_works()
+    test_exact_threshold_shares_works()
     print("\nAll share recovery tests passed!")
 
 
