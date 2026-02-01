@@ -8,6 +8,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
+from embit import bip39
+
 from model import (
     Codex32InputError,
     parse_codex32_share,
@@ -23,6 +25,7 @@ from model import (
 VECTOR4 = {
     "codex32": "ms10leetsllhdmn9m42vcsamx24zrxgs3qrl7ahwvhw4fnzrhve25gvezzyqqtum9pgv99ycma",
     "seed_hex": "ffeeddccbbaa99887766554433221100ffeeddccbbaa99887766554433221100",
+    "mnemonic": "zoo ivory industry jar praise service talk skirt during october lounge acid year humble cream inspire office dry sunset pride drip much dune arm",
     "length": 74,
     "seed_bytes": 32,
     "word_count": 24,
@@ -81,8 +84,10 @@ def test_256bit_to_mnemonic():
     assert len(words) == VECTOR4["word_count"], (
         f"Expected {VECTOR4['word_count']} words, got {len(words)}"
     )
+    assert mnemonic == VECTOR4["mnemonic"], (
+        f"Mnemonic mismatch: got {mnemonic}"
+    )
     print(f"test_256bit_to_mnemonic: PASS ({len(words)} words)")
-    print(f"  Mnemonic: {mnemonic}")
 
 
 def test_128bit_still_works():
@@ -171,7 +176,8 @@ def test_256bit_single_char_corruption():
     """Test that single character corruption is detected in 256-bit strings."""
     valid = "ms10leetsllhdmn9m42vcsamx24zrxgs3qrl7ahwvhw4fnzrhve25gvezzyqqtum9pgv99ycma"
 
-    # Test corruption at various positions
+    # Test corruption at key positions:
+    # 0=HRP, 10=identifier, 30=payload middle, 50=payload, 73=last char (checksum)
     positions = [0, 10, 30, 50, 73]
     corruptions_detected = 0
 
@@ -223,8 +229,6 @@ def test_75_char_length_rejected():
 
 def test_mnemonic_words_are_valid_bip39():
     """Test that generated mnemonic words are valid BIP39 words."""
-    from embit import bip39
-
     # 256-bit mnemonic
     mnemonic = codex32_to_mnemonic(VECTOR4["codex32"])
 
