@@ -11,6 +11,7 @@ from model import (
     codex32_to_seed_bytes,
     parse_codex32_share,
     recover_secret_share,
+    try_correct_codex32_errors,
     VALID_LENGTHS,
 )
 
@@ -35,6 +36,50 @@ def _is_valid_bech32_char(value: str) -> bool:
 
 def _is_backspace(value: str) -> bool:
     return value == "" or value == "<"
+
+
+def _attempt_error_correction(codex_str: str, max_errors: int = 2) -> str | None:
+    """Attempt to correct errors in a codex32 string.
+
+    Offers correction candidates to user for confirmation per BIP-93.
+
+    Args:
+        codex_str: The string that failed validation
+        max_errors: Maximum errors to search for (default 2 for speed)
+
+    Returns:
+        Corrected string if user accepts, None otherwise
+    """
+    view.display_checksum_failed()
+
+    if not view.confirm("Would you like to search for corrections?"):
+        return None
+
+    view.display_correction_searching(max_errors)
+    result = try_correct_codex32_errors(codex_str, max_errors=max_errors)
+
+    if not result.success or not result.candidates:
+        view.display_error(f"No corrections found with up to {max_errors} errors.")
+        return None
+
+    view.display_correction_candidates(result.candidates)
+
+    if len(result.candidates) == 1:
+        # Single candidate - just confirm
+        if view.confirm_correction(result.candidates[0]):
+            return result.candidates[0].corrected_string
+        return None
+
+    # Multiple candidates - let user choose
+    choice = view.get_correction_choice(len(result.candidates))
+    if choice is None:
+        return None
+
+    selected = result.candidates[choice - 1]
+    if view.confirm_correction(selected):
+        return selected.corrected_string
+
+    return None
 
 
 def collect_codex32_boxes(prefix: str, start_box: int, total_len: int) -> str:
@@ -124,8 +169,19 @@ def run(entry_mode: str = "box") -> int:
             first_share = parse_codex32_share(codex_str)
         except Codex32InputError as exc:
             view.display_error(str(exc))
-            view.wait_for_retry()
-            continue
+            # Offer error correction for checksum failures
+            corrected = _attempt_error_correction(codex_str)
+            if corrected:
+                try:
+                    first_share = parse_codex32_share(corrected)
+                    codex_str = corrected
+                except Codex32InputError:
+                    view.display_error("Correction still invalid. Please re-enter.")
+                    view.wait_for_retry()
+                    continue
+            else:
+                view.wait_for_retry()
+                continue
         if first_share.share_idx.lower() == "s":
             try:
                 seed_bytes = codex32_to_seed_bytes(first_share.s)
@@ -171,8 +227,19 @@ def run(entry_mode: str = "box") -> int:
                 candidate = parse_codex32_share(codex_str)
             except Codex32InputError as exc:
                 view.display_error(str(exc))
-                view.wait_for_retry()
-                continue
+                # Offer error correction for checksum failures
+                corrected = _attempt_error_correction(codex_str)
+                if corrected:
+                    try:
+                        candidate = parse_codex32_share(corrected)
+                        codex_str = corrected
+                    except Codex32InputError:
+                        view.display_error("Correction still invalid. Please re-enter.")
+                        view.wait_for_retry()
+                        continue
+                else:
+                    view.wait_for_retry()
+                    continue
             if candidate.k != first_share.k or candidate.ident != first_share.ident:
                 view.display_error("Share header mismatch (k/identifier).")
                 view.wait_for_retry()

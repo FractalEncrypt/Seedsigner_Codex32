@@ -118,3 +118,57 @@ def recover_secret_share(shares: list[Codex32String]) -> Codex32String:
         return Codex32String.interpolate_at(shares, target="s")
     except CodexError as exc:
         raise Codex32InputError(str(exc)) from exc
+
+
+# ---------------------------------------------------------------------------
+# Error Correction (ECW) Functions
+# ---------------------------------------------------------------------------
+
+def try_correct_codex32_errors(
+    codex_str: str,
+    max_errors: int = 4,
+    stop_on_first: bool = False,
+):
+    """Attempt to correct errors in a codex32 string.
+
+    This function searches for valid corrections by trying character
+    substitutions and validating each candidate. Per BIP-93, corrections
+    should be user-confirmed before use.
+
+    Args:
+        codex_str: The potentially corrupted codex32 string
+        max_errors: Maximum number of errors to attempt (1-4, default 4)
+        stop_on_first: If True, return after finding first valid correction
+
+    Returns:
+        CorrectionResult with success status and list of candidates
+
+    Example:
+        >>> result = try_correct_codex32_errors("MS12NAMES6XQGUZTTXKEQNJSJZV4JV3NZ5K3KWGSPHUH6EVX")
+        >>> if result.success:
+        ...     for candidate in result.candidates:
+        ...         print(f"Found: {candidate.corrected_string}")
+    """
+    from error_correction import try_correct_errors
+    return try_correct_errors(codex_str, max_errors, stop_on_first)
+
+
+def try_correct_with_erasures(
+    codex_str: str,
+    erasure_positions: list[int],
+):
+    """Correct errors when some positions are known to be wrong (erasures).
+
+    When the user marks positions as "unknown" or "unreadable", we only
+    need to search those specific positions, making correction much faster.
+    Erasures can correct up to 8 positions (vs 4 for unknown errors).
+
+    Args:
+        codex_str: The codex32 string with erasures
+        erasure_positions: List of positions (0-indexed) that are known errors
+
+    Returns:
+        CorrectionResult with valid correction candidates
+    """
+    from error_correction import try_correct_with_erasures as _try_erasures
+    return _try_erasures(codex_str, erasure_positions)
