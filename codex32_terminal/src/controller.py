@@ -12,11 +12,11 @@ from model import (
     parse_codex32_share,
     recover_secret_share,
     try_correct_codex32_errors,
-    VALID_LENGTHS,
 )
 
 
-# Supported seed sizes: 128-bit (48 chars) or 256-bit (74 chars)
+# Supported seed sizes - must match VALID_LENGTHS in model.py
+# 128-bit (48 chars) or 256-bit (74 chars)
 LEN_128BIT = 48
 LEN_256BIT = 74
 BASE_PREFIX = "MS1"

@@ -95,14 +95,11 @@ def seed_bytes_to_mnemonic(seed_bytes: bytes) -> str:
     Args:
         seed_bytes: 16 bytes (128-bit) for 12 words, or 32 bytes (256-bit) for 24 words
     """
-    if len(seed_bytes) == 16:
-        return bip39.mnemonic_from_bytes(seed_bytes)  # 12 words
-    elif len(seed_bytes) == 32:
-        return bip39.mnemonic_from_bytes(seed_bytes)  # 24 words
-    else:
+    if len(seed_bytes) not in (16, 32):
         raise Codex32InputError(
             f"Expected 16 bytes (12 words) or 32 bytes (24 words), got {len(seed_bytes)} bytes"
         )
+    return bip39.mnemonic_from_bytes(seed_bytes)
 
 
 def codex32_to_mnemonic(codex_str: str) -> str:

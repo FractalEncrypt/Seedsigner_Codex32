@@ -1,5 +1,10 @@
 """BCH error correction decoder for Codex32/BIP-93.
 
+NOTE: This module is currently NOT USED. The error_correction.py module uses a
+validated brute-force approach instead, which is simpler and guaranteed correct.
+This module is kept for potential future optimization when performance becomes
+critical (e.g., embedded systems with limited resources).
+
 This module implements BCH (Bose-Chaudhuri-Hocquenghem) error correction
 for codex32 strings as specified in BIP-93.
 

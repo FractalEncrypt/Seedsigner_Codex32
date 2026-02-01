@@ -227,8 +227,9 @@ def test_format_diff():
 
 def test_search_space():
     """Search space math is correct."""
-    # 48-char, 1 error: 45 * 31 = 1395
-    assert estimate_search_space(48, 1) == 45 * 31
+    # 48-char string, 1 error: (48-3 data chars) * 31 alternatives = 1395
+    # The "ms1" prefix (3 chars) is excluded from error correction
+    assert estimate_search_space(48, 1) == (48 - 3) * 31
     print("test_search_space: PASS")
 
 
