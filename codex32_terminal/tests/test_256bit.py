@@ -152,6 +152,94 @@ def test_seed_bytes_to_mnemonic_both_sizes():
     print("test_seed_bytes_to_mnemonic_both_sizes: PASS")
 
 
+def test_256bit_invalid_checksum_rejected():
+    """Test that 256-bit strings with invalid checksums are rejected."""
+    # Valid: ms10leetsllhdmn9m42vcsamx24zrxgs3qrl7ahwvhw4fnzrhve25gvezzyqqtum9pgv99ycma
+    # Change last character to corrupt checksum
+    invalid = "ms10leetsllhdmn9m42vcsamx24zrxgs3qrl7ahwvhw4fnzrhve25gvezzyqqtum9pgv99ycmx"
+
+    try:
+        parse_codex32_share(invalid)
+        raise AssertionError("Should have rejected invalid 256-bit checksum")
+    except Codex32InputError:
+        pass
+
+    print("test_256bit_invalid_checksum_rejected: PASS")
+
+
+def test_256bit_single_char_corruption():
+    """Test that single character corruption is detected in 256-bit strings."""
+    valid = "ms10leetsllhdmn9m42vcsamx24zrxgs3qrl7ahwvhw4fnzrhve25gvezzyqqtum9pgv99ycma"
+
+    # Test corruption at various positions
+    positions = [0, 10, 30, 50, 73]
+    corruptions_detected = 0
+
+    for pos in positions:
+        char_list = list(valid)
+        original = char_list[pos]
+        # Pick a different bech32 char
+        char_list[pos] = 'q' if original != 'q' else 'p'
+        corrupted = ''.join(char_list)
+
+        try:
+            parse_codex32_share(corrupted)
+        except Codex32InputError:
+            corruptions_detected += 1
+
+    assert corruptions_detected == len(positions), (
+        f"Only detected {corruptions_detected}/{len(positions)} corruptions"
+    )
+    print(f"test_256bit_single_char_corruption: PASS ({corruptions_detected} detected)")
+
+
+def test_73_char_length_rejected():
+    """Test that 73 characters (one short of 256-bit) is rejected."""
+    # 73 chars - too short for 256-bit
+    too_short = "ms10leetsllhdmn9m42vcsamx24zrxgs3qrl7ahwvhw4fnzrhve25gvezzyqqtum9pgv99ycm"
+
+    try:
+        parse_codex32_share(too_short)
+        raise AssertionError("Should have rejected 73-char input")
+    except Codex32InputError:
+        pass
+
+    print("test_73_char_length_rejected: PASS")
+
+
+def test_75_char_length_rejected():
+    """Test that 75 characters (one more than 256-bit) is rejected."""
+    # 75 chars - too long for 256-bit
+    too_long = "ms10leetsllhdmn9m42vcsamx24zrxgs3qrl7ahwvhw4fnzrhve25gvezzyqqtum9pgv99ycmaa"
+
+    try:
+        parse_codex32_share(too_long)
+        raise AssertionError("Should have rejected 75-char input")
+    except Codex32InputError:
+        pass
+
+    print("test_75_char_length_rejected: PASS")
+
+
+def test_mnemonic_words_are_valid_bip39():
+    """Test that generated mnemonic words are valid BIP39 words."""
+    from embit import bip39
+
+    # 256-bit mnemonic
+    mnemonic = codex32_to_mnemonic(VECTOR4["codex32"])
+
+    # Verify each word is in BIP39 wordlist
+    for word in mnemonic.split():
+        assert word in bip39.WORDLIST, f"'{word}' is not a valid BIP39 word"
+
+    # 128-bit mnemonic
+    mnemonic_128 = codex32_to_mnemonic(VECTOR2["codex32"])
+    for word in mnemonic_128.split():
+        assert word in bip39.WORDLIST, f"'{word}' is not a valid BIP39 word"
+
+    print("test_mnemonic_words_are_valid_bip39: PASS")
+
+
 def main():
     test_valid_lengths_constant()
     test_256bit_parse()
@@ -162,6 +250,11 @@ def main():
     test_auto_detect_length()
     test_invalid_length_rejected()
     test_seed_bytes_to_mnemonic_both_sizes()
+    test_256bit_invalid_checksum_rejected()
+    test_256bit_single_char_corruption()
+    test_73_char_length_rejected()
+    test_75_char_length_rejected()
+    test_mnemonic_words_are_valid_bip39()
     print("\nAll 256-bit tests passed!")
 
 
