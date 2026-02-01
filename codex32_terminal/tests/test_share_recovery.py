@@ -120,10 +120,111 @@ def test_vector3_different_share_combination():
     print("test_vector3_different_share_combination: PASS")
 
 
+def test_duplicate_share_rejected():
+    """Test that duplicate share indices are rejected.
+
+    If the same share is provided twice, interpolation should fail
+    because we need k distinct shares.
+    """
+    from model import Codex32InputError
+
+    # Same share twice
+    shares = [
+        parse_codex32_share(VECTOR2_SHARES["A"]),
+        parse_codex32_share(VECTOR2_SHARES["A"]),  # Duplicate
+    ]
+
+    try:
+        recover_secret_share(shares)
+        raise AssertionError("Should have rejected duplicate shares")
+    except Codex32InputError:
+        pass  # Expected - duplicate indices
+
+    print("test_duplicate_share_rejected: PASS")
+
+
+def test_empty_share_list_rejected():
+    """Test that empty share list is rejected."""
+    from model import Codex32InputError
+
+    try:
+        recover_secret_share([])
+        raise AssertionError("Should have rejected empty share list")
+    except Codex32InputError as e:
+        assert "no shares" in str(e).lower(), f"Error should mention no shares: {e}"
+
+    print("test_empty_share_list_rejected: PASS")
+
+
+def test_insufficient_shares_rejected():
+    """Test that fewer than threshold shares is rejected.
+
+    For k=2, we need at least 2 shares.
+    """
+    from model import Codex32InputError
+
+    # Only 1 share when k=2 is required
+    shares = [
+        parse_codex32_share(VECTOR2_SHARES["A"]),
+    ]
+
+    try:
+        recover_secret_share(shares)
+        raise AssertionError("Should have rejected insufficient shares")
+    except Codex32InputError:
+        pass  # Expected - not enough shares
+
+    print("test_insufficient_shares_rejected: PASS")
+
+
+def test_mismatched_identifiers_rejected():
+    """Test that shares with different identifiers are rejected.
+
+    All shares must have the same identifier (e.g., 'NAME' or 'cash').
+    """
+    from model import Codex32InputError
+
+    # Mix shares from Vector 2 (NAME) and Vector 3 (cash)
+    shares = [
+        parse_codex32_share(VECTOR2_SHARES["A"]),  # NAME
+        parse_codex32_share(VECTOR3_SHARES["A"]),  # cash
+    ]
+
+    try:
+        recover_secret_share(shares)
+        raise AssertionError("Should have rejected mismatched identifiers")
+    except Codex32InputError:
+        pass  # Expected - mismatched identifiers
+
+    print("test_mismatched_identifiers_rejected: PASS")
+
+
+def test_extra_shares_still_works():
+    """Test that providing more than threshold shares still works.
+
+    For k=2, providing 3 consistent shares should still recover correctly.
+    """
+    # Generate a third share from Vector 2 by using the secret
+    # Actually, we only have A and C from Vector 2, so we can't test this easily
+    # without generating additional shares. Skip for now.
+    #
+    # This test would require either:
+    # 1. Having a third test vector share, or
+    # 2. Generating shares from the known S-share
+
+    # For now, just verify k shares works (already covered in other tests)
+    print("test_extra_shares_still_works: SKIP (would need additional test vectors)")
+
+
 def main():
     test_vector2_share_recovery()
     test_vector3_share_recovery()
     test_vector3_different_share_combination()
+    test_duplicate_share_rejected()
+    test_empty_share_list_rejected()
+    test_insufficient_shares_rejected()
+    test_mismatched_identifiers_rejected()
+    test_extra_shares_still_works()
     print("\nAll share recovery tests passed!")
 
 

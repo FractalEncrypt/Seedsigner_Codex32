@@ -135,6 +135,89 @@ def test_case_insensitive_but_consistent():
     print("test_case_insensitive_but_consistent: PASS")
 
 
+def test_invalid_bech32_characters_rejected():
+    """Test that invalid bech32 characters are rejected.
+
+    Bech32 alphabet excludes: 1, b, i, o (to avoid confusion).
+    The '1' is only valid as the HRP separator.
+    """
+    # 'b' is not in bech32 alphabet - inject it into a valid string
+    # Valid: MS12NAMES6XQGUZTTXKEQNJSJZV4JV3NZ5K3KWGSPHUH6EVW
+    with_b = "MS12NAMbS6XQGUZTTXKEQNJSJZV4JV3NZ5K3KWGSPHUH6EVW"
+
+    try:
+        parse_codex32_share(with_b)
+        raise AssertionError("Should have rejected string with 'b'")
+    except Codex32InputError:
+        pass  # Expected - invalid character or checksum failure
+
+    # 'i' is not in bech32 alphabet
+    with_i = "MS12NAMiS6XQGUZTTXKEQNJSJZV4JV3NZ5K3KWGSPHUH6EVW"
+
+    try:
+        parse_codex32_share(with_i)
+        raise AssertionError("Should have rejected string with 'i'")
+    except Codex32InputError:
+        pass  # Expected
+
+    # 'o' is not in bech32 alphabet
+    with_o = "MS12NAMoS6XQGUZTTXKEQNJSJZV4JV3NZ5K3KWGSPHUH6EVW"
+
+    try:
+        parse_codex32_share(with_o)
+        raise AssertionError("Should have rejected string with 'o'")
+    except Codex32InputError:
+        pass  # Expected
+
+    print("test_invalid_bech32_characters_rejected: PASS")
+
+
+def test_mixed_case_rejected():
+    """Test that mixed case (upper and lower in same string) is rejected.
+
+    Bech32 requires consistent case throughout the string.
+    """
+    # Mix upper and lower - should fail
+    mixed = "MS12names6XQGUZTTXKEQNJSJZV4JV3NZ5K3KWGSPHUH6EVW"
+
+    try:
+        parse_codex32_share(mixed)
+        raise AssertionError("Should have rejected mixed case input")
+    except Codex32InputError:
+        pass  # Expected - mixed case or checksum failure
+
+    print("test_mixed_case_rejected: PASS")
+
+
+def test_none_input_returns_empty_error():
+    """Test that None input is handled gracefully."""
+    try:
+        parse_codex32_share(None)
+        raise AssertionError("Should have rejected None input")
+    except Codex32InputError as e:
+        assert "empty" in str(e).lower(), f"Error should mention empty: {e}"
+
+    print("test_none_input_returns_empty_error: PASS")
+
+
+def test_wrong_hrp_rejected():
+    """Test that wrong HRP (human-readable part) is rejected.
+
+    Codex32 requires 'ms' as the HRP.
+    """
+    # Change HRP from 'ms' to 'bc' (Bitcoin address HRP)
+    wrong_hrp = "BC12NAMES6XQGUZTTXKEQNJSJZV4JV3NZ5K3KWGSPHUH6EVW"
+
+    try:
+        parse_codex32_share(wrong_hrp)
+        raise AssertionError("Should have rejected wrong HRP")
+    except Codex32InputError as e:
+        # Should fail - either wrong HRP or checksum
+        pass
+
+    print("test_wrong_hrp_rejected: PASS")
+
+
 def main():
     test_invalid_checksum_rejected()
     test_wrong_length_rejected()
@@ -143,6 +226,10 @@ def main():
     test_sanitize_input()
     test_valid_share_accepted()
     test_case_insensitive_but_consistent()
+    test_invalid_bech32_characters_rejected()
+    test_mixed_case_rejected()
+    test_none_input_returns_empty_error()
+    test_wrong_hrp_rejected()
     print("\nAll validation tests passed!")
 
 
