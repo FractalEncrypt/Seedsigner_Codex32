@@ -1,0 +1,155 @@
+-----------------------------
+From:Keith Mukai
+"compiling" is a misnomer. Building a SeedSigner OS image that points to your own fork should be quick to rebuild (~25 seconds?).
+
+The best option at the moment is to go through the full manual/dev build process (uses Raspi OS). Then it's trivial to make a python edit, restart the SeedSigner process (not a full OS reboot), verify result.
+
+-----------------------------
+From: Jean Do
+If you're using seedsigner-os to actually build images.  can edit source file directly in opt/rootfs-overlay/opt/src/seedsigner/models/settings_definition.py and then use ./build-sh with --no-clean and --skip-repo options to build from whatever is already there.  fast turn-around.
+
+See the seedsigner-os docs dev_workflow.md documentation for how to step into the docker container and do things step by step.
+
+ie:
+# considering I've rebooted recently, restart the container
+# (btw: I have an older version of docker so my commands and container names are slightly different).
+SS_ARGS="--no-op" docker-compose up -d --no-recreate
+
+# step into the container so that it feels like that container is a *nix system
+docker exec -it seedsigner-os_build-images_1 bash
+
+# since the last time I built, it was for pi0, I don't have to rebuild everything again.
+./build.sh --pi0 --no-clean --skip-repo
+
+while in another window, you're editing code files in opt/rootfs-overlay/opt/src/seedsigner/... between reruns of that last command... and reflashing your sdcard to try it on your device.
+
+----------------
+My Reply:
+I'm trying to follow these instructions to build a custom SeedSigner-OS image (Pi Zero) so I can test the modified camera-rotation options I added to settings_definition.py. I've been messing around in Windsurf trying to get it to work, but running in circles, here's a breakdown...
+.
+Environment:
+
+• Host OS – Windows 10 Pro (WSL 2 & Docker Desktop)
+• Repo – fresh clone of seedsigner-os 
+• Container – seedsigner-os-build-images-1 started with SS_ARGS="--no-op"
+• Build cmd (inside container)
+
+'bash
+./build.sh --pi0 --skip-repo --no-clean'
+
+Error encountered:
+1. Empty Buildroot – pi0_defconfig missing
+
+'''make: *** No rule to make target 'pi0_defconfig'.  Stop.'''
+
+Inside the container /opt/buildroot/ is empty.
+Work-around I used:
+
+'''bash
+cd /opt
+wget https://buildroot.org/downloads/buildroot-2021.02.12.tar.gz
+tar xf buildroot-2021.02.12.tar.gz
+rm -rf buildroot && ln -s buildroot-2021.02.12 buildroot'''
+
+2 .Post-build script expects Python 3.10'''
+
+'''find: '/output/target/usr/lib/python3.10': No such file or directory
+/opt/pi0/board/post-build.sh: 91: /output/host/bin/python3.10: not found'''
+Buildroot toolchain only ships Python 3.9, so I patched once:
+
+'''bash
+sed -i 's/3\.10/3.9/g' /opt/pi0/board/post-build.sh'''
+…but every clean Buildroot restore resets the script.
+
+Questions:
+1. Should Buildroot be auto-populated by build.sh?
+
+2. Is post-build.sh meant to use Python 3.10? If so, how do I expose that interpreter to Buildroot?
+
+3. Is there a simpler / documented loop for quick source edits (e.g., camera rotation) without manual Buildroot re-installation and script patching?
+
+Any guidance would be greatly appreciated. Thanks!
+
+--------------------------------------------------------------
+From: Jean Do
+sounds like you didn't do a recursive clone or something
+Just follow the Linux/Mac instructions, they  "just work" in WSL
+When you're doing "./build.sh --pi0 --skip-repo --no-clean", then the assumption is that your environment has already been built in the past for the pi0.  If not, at least run one "./build.sh —pi0" and give it up 40-120 minutes to complete.  After that, as long as building for same platform, you can use —skip-repo (since your rootfs-overlay will be there from last time) and —no-clean (so that it avoids re-building/compiling all of the buildroot pieces that are necessary for a system that can boot pi0).
+and make sure that you cloned recursive.  "git submodule update —init —recursive" is safe to run to get all submodules if not already there.  won't hurt if it's not necessary... a git staple command worth remembering.
+
+---------------------------------------------------------
+
+My Reply:
+
+Okay when I do the recursive clone, I don't know where to find the settings_definitions.py file to edit 
+
+Jean says to go here; 
+If you're using seedsigner-os to actually build images.  can edit source file directly in opt/rootfs-overlay/opt/src/seedsigner/models/settings_definition.py 
+
+
+But that doesn't seem to exist in the OS repo; I get here and there's no "opt" folder inside this one...
+
+opt/rootfs-overlay
+
+----------------------------------------------------------
+From: Jean Do
+it will appear the first time you build without the —skip-repo option.  The first step is to clone seedsigner repos, next it starts building the system.
+you'll have to build normal at least once.  "./build.sh —pi0" will be enough.
+
+first time is slow... after that, it's minutes when using "—no-clean" or less than a minute using "—no-clean —skip-repo" since it doesn't even need to download.
+-------------------------------------------------------
+My Reply:
+LOL "./build.sh —pi0" gave a new error; (I tried to include some extra terminal lines for context where it failed);
+
+
+>>> host-gcc-initial 11.3.0 Downloading
+wget --passive-ftp -nd -t 3 -O '/output/build/.gcc-11.3.0.tar.xz.vz0uMJ/output' 'http://ftpmirror.gnu.org/gcc/gcc-11.3.0/gcc-11.3.0.tar.xz'
+--2025-06-24 19:58:30--  http://ftpmirror.gnu.org/gcc/gcc-11.3.0/gcc-11.3.0.tar.xz
+Resolving ftpmirror.gnu.org (ftpmirror.gnu.org)... 209.51.188.200, 209.51.188.200, 2001:470:142:5::200, ...
+Connecting to ftpmirror.gnu.org (ftpmirror.gnu.org)|209.51.188.200|:80... connected.
+HTTP request sent, awaiting response... 302 Moved Temporarily
+Location: http://mirror.rit.edu/gnu/gcc/gcc-11.3.0/gcc-11.3.0.tar.xz [following]
+--2025-06-24 19:58:30--  http://mirror.rit.edu/gnu/gcc/gcc-11.3.0/gcc-11.3.0.tar.xz
+Resolving mirror.rit.edu (mirror.rit.edu)... 129.21.171.72, 129.21.171.72, 129.21.171.72, ...
+Connecting to mirror.rit.edu (mirror.rit.edu)|129.21.171.72|:80... connected.
+HTTP request sent, awaiting response... 200 OK
+Length: 81141364 (77M) [application/x-xz]
+Saving to: '/output/build/.gcc-11.3.0.tar.xz.vz0uMJ/output'
+
+/output/build/.gcc-11.3.0.tar.xz 100%[==========================================================>]  77.38M  21.1MB/s    in 4.3s    
+
+2025-06-24 19:58:35 (17.9 MB/s) - '/output/build/.gcc-11.3.0.tar.xz.vz0uMJ/output' saved [81141364/81141364]
+
+ERROR: No hash found for gcc-11.3.0.tar.xz
+make[1]: *** [package/pkg-generic.mk:189: /output/build/host-gcc-initial-11.3.0/.stamp_downloaded] Error 1
+make: *** [Makefile:23: _all] Error 2
+
+--------------------------------------------------------------------------
+
+From Jean Do
+this is my fault, i suspect, for having assumed that you'd built once before.  Maybe your entire docker container needs to be built.  Let me find a one-off command that works (like ytcryptoguide mentioned) where it builds everything in one step.  Then once that has worked, you can use the short cuts that I misled you into trying.
+exit from the container, then from your powershell, more like
+
+PowerShell
+
+
+$env:SS_ARGS = "--pi0 --app-branch=dev"
+docker compose up --force-recreate --build
+
+It's similar to stepping into a pre-built container and running ./build.sh --pi0 --app-branch=dev except that it will force building the container from scratch.  It will grab the latest "dev" branch from the seedsigner repo... which is currently candidate for near-term release.  You'll also be helping to prove that you can reproduce the same binaries that we're verifying in the past few days.
+
+Docs are https://github.com/SeedSigner/seedsigner-os/blob/main/docs/building.md#configure-and-begin-the-build
+
+-------------------------------------------------------------------------
+Note: I had some more errors running powershell builds. I tried the WSL instructions and that did work to build the image, but I had a few more hiccups. 
+-------------------------------------------------------------------------
+From: Jean Do:
+ok, so my shortcuts yesterday are around the concept I'll describe below
+seedsigner-os has nothing to do with seedsigner software, except that by default, it pulls the seedsigner software from the seedsigner repo.  build.sh script has a few interesting options to alter that.
+* —app-repo allows you to set it to a different repo than SeedSigner/seedsigner.git... so you can point it to your own github fork.
+* —app-branch and —app-commit both allow you to specify a particular branch or even a particular commit height as long as it exists in the repo specified by —app-repo.
+* —skip-repo doesn't pull anything from the internet, it assumes that you've already put your software into the rootfs-overlay directory structure (most likely from the last time you ran it).
+* —no-clean means don't clean anything from the temporary compilation and linking directory, so nothing needs to be recompiled (using everything for the same platform you built last time and simply re-linking everything into a new image).
+so my shortcut yesterday was about stepping into the container and using "—skip-repo —no-clean" which would allow you to edit software in the rootfs-overlay directory and re-link a new executable image without downloading (overwriting your changes) and without compiling anything new.  It can actually finish in seconds on a fast machine like yours.
+
+btw: I ALWAYS start by setting up seedsigner-os and proving to myself that I can reproduce a binary that others have reproduced... that way I know Im setup... then I play.  If I break something and cannot figure out where Im at... I just keep trying to reproduce a known binary to know that Im back in shape.  It's a sanity-checkpoint

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from codex32 import Codex32String, CodexError
+from codex32_min import Codex32String, CodexError
 from embit import bip39
 
 

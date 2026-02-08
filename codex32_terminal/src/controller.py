@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from codex32.bech32 import CHARSET
+from codex32_min import CHARSET
 
 import view
 from model import (

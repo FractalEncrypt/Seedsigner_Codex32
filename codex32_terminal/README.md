@@ -2,7 +2,7 @@
 
 This folder contains a terminal-based MVP for validating Codex32 shares, recovering a secret `S` share from `k-of-n` shares, and converting the master seed into a 12-word BIP39 mnemonic (display-only).
 
-## Current status (Jan 31, 2026)
+## Current status (Feb 2, 2026)
 
 ✅ Terminal MVP complete for:
 
@@ -11,8 +11,9 @@ This folder contains a terminal-based MVP for validating Codex32 shares, recover
 - Checksum + header validation
 - `k-of-n` share recovery via interpolation
 - Display recovered `S` share, seed hex, and BIP39 mnemonic
+- ✅ Integrated into SeedSigner (Codex32 share entry, validation, and recovery UI)
 
-⚠️ Not an ECW yet (no error correction). The codex32 Python library does **not** provide substitution/erasure correction, so this tool does not attempt it. Error-correction should be implemented separately before advertising ECW behavior.
+⚠️ Not an ECW yet (no error correction). The tool does **not** provide substitution/erasure correction, so it does not attempt it. Error-correction should be implemented separately before advertising ECW behavior.
 
 ## Setup (Windows PowerShell)
 
@@ -20,8 +21,7 @@ From the repo root:
 
 ```powershell
 python -m venv .\codex32_terminal\venv
-.\codex32_terminal\venv\Scripts\Activate.ps1 ; pip install codex32 embit
-pip freeze > .\codex32_terminal\requirements.txt
+.\codex32_terminal\venv\Scripts\python -m pip install -r .\codex32_terminal\requirements.txt
 ```
 
 > Note: Use a semicolon between `Activate.ps1` and subsequent commands in PowerShell.
@@ -48,6 +48,38 @@ Features:
 ```
 
 Paste full shares in sequence. For `k-of-n` shares, the tool will ask for additional shares until the threshold is met.
+
+### Build a test share (checksum helper)
+
+Use `build_share.py` to append a valid Codex32 checksum to a header + payload.
+
+```powershell
+.\codex32_terminal\venv\Scripts\Activate.ps1 ; python .\codex32_terminal\src\build_share.py --header MS12MEMEC --payload YGHT84MU68S9FZX0PWQ7D890LZ
+```
+
+Interactive mode (no flags) guides you through k/identifier/payload and generates A/C/D/E/F shares automatically:
+
+```powershell
+.\codex32_terminal\venv\Scripts\Activate.ps1 ; python .\codex32_terminal\src\build_share.py
+```
+
+Example output:
+
+```
+MS12MEMECYGHT84MU68S9FZX0PWQ7D890LZ{checksum}
+```
+
+Notes:
+- `--header` should be `MS1 + k + ident(4) + share_idx` (6 chars after `MS1`).
+- Payload must use the Codex32 charset (`qpzry9x8gf2tvdw0s3jn54khce6mua7l`).
+- 128-bit shares expect a 26-character payload.
+- Interactive mode supports k=2-5 and can auto-generate distinct payloads.
+
+### SeedSigner entry tips
+
+- Printable share cards: `C:\Users\FractalEncrypt\Documents\Windsurf\Seedsigner_Codex32\Printable Codex32 Share backup cards`
+  - Fill a card and enter the share using the grid (one box per character).
+- Text editor method: keep the share in a monospaced editor and use the **Col** value as the SeedSigner share box number while entering box-by-box.
 
 ## Test vectors
 
@@ -78,6 +110,10 @@ Expected output:
 
 ## Codebase overview
 
+- `src/codex32_min.py`
+  - Pure-Python Codex32 implementation (checksum, encode/decode, interpolation)
+  - Implements the BIP-93 reference algorithms without native dependencies
+
 - `src/model.py`
   - Input sanitation and validation (Codex32 checksum + header)
   - Seed extraction and BIP39 mnemonic conversion
@@ -98,7 +134,7 @@ Expected output:
 
 ### Implementation rationale
 
-- **Validation** uses `codex32.Codex32String`, which enforces checksum + header correctness.
+- **Validation** uses the vendored `codex32_min.Codex32String`, which enforces checksum + header correctness.
 - **Recovery** uses `Codex32String.interpolate_at` to reconstruct the `S` share from `k` valid shares.
 - **BIP39 mnemonic** is a display encoding of the 16-byte master seed (no PBKDF2). This mirrors BIP-93 guidance.
 
