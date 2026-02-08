@@ -51,6 +51,10 @@ Paste full shares in sequence. For `k-of-n` shares, the tool will ask for additi
 
 ### Build a test share (checksum helper)
 
+Use this script to create your own Cocdex32 keys for testing. You decide the number of shares, the 4-character identifier, and even the payload.
+
+The payload is the "26 random characters" that are generated throuh the Codex32 dice debiasing process, but for testing this tool, you can just make up those 26 characters.
+
 Use `build_share.py` to append a valid Codex32 checksum to a header + payload.
 
 ```powershell
@@ -143,21 +147,22 @@ Expected output:
 1. **Integrate with SeedSigner UI flow**
    - Replace terminal prompts with on-device screens and key input.
    - Map box-by-box input into SeedSigner’s `Keypad` and display components.
+   - COMPLETED
 
 2. **Share-entry UX**
    - Pre-fill `MS1` for first share, `MS1 + k + ident` for subsequent shares.
    - Enforce header consistency across shares and prevent duplicate indices.
+   - COMPLETED
 
 3. **Error-correction (ECW work)**
    - Implement the BIP-93 requirement for up to 4 substitution/erasure corrections.
    - Add user-confirmed correction candidates; do not auto-apply.
+   - This is waiting for formal documentation and implementation specs from the Codex32 cryptography team
 
-4. **State persistence (optional)**
-   - Store partial share entry progress between sessions.
+4. **Backup S Share (optional)**
+   - Add a new button in the "Backup Seed" screen so the user can backup the Codex32 S share master secret.
 
 5. **Unit tests**
    - Port terminal tests to SeedSigner test harness or add unit tests around recovery logic.
 
 ---
-
-If you want to continue the port, the next concrete step is to stub SeedSigner screens for share entry and reuse `model.py` logic for validation + recovery.
