@@ -51,6 +51,10 @@ Paste full shares in sequence. For `k-of-n` shares, the tool will ask for additi
 
 ### Build a test share (checksum helper)
 
+Use this script to create your own Cocdex32 keys for testing. You decide the number of shares, the 4-character identifier, and even the payload.
+
+The payload is the "26 random characters" that are generated throuh the Codex32 dice debiasing process, but for testing this tool, you can just make up those 26 characters.
+
 Use `build_share.py` to append a valid Codex32 checksum to a header + payload.
 
 ```powershell
