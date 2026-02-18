@@ -1,0 +1,8 @@
+
+First you have to be in the right folder - and Docker Desktop has to be up and the engine running.
+
+ cd "C:\Users\FractalEncrypt\Documents\Windsurf\seedsigner-os-stock"
+## Copy from dev
+robocopy "C:\Users\FractalEncrypt\Documents\Windsurf\SeedSigner\src\seedsigner" "C:\Users\FractalEncrypt\Documents\Windsurf\seedsigner-os-stock\opt\rootfs-overlay\opt\src\seedsigner" /MIR /XD "__pycache__" ".pytest_cache" ".ruff_cache" /XF "*.pyc"
+## Build
+ $env:DOCKER_DEFAULT_PLATFORM = 'linux/amd64'; $env:SS_ARGS = "--pi0 --skip-repo --no-clean"; docker compose up --force-recreate --build

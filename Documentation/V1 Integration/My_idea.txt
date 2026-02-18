@@ -1,0 +1,56 @@
+My Idea - 
+I'd like to create a terminal only version of a potential Seedsigner feature that would allow transforming of Codex32 paper/metal secrets into 12-word bip39 seed phrases.
+I'll need to build and test in the terminal first, so I'll create some throwaway Codex32 shares that can be used for testing. 
+I will create a single "s" share secret key (with no shares), since it is easier to create just one key, and the S share also represents a fully reconstructed Codex32 key from a threshold number of shamir shares.
+I'll also create a 2-of-3 SSSS set of 3 key shares that can be recovered into an S share.
+While these are absolutely real Codex32 keys, I'll only use them for testing, and never store any funds, so we won't need to worry too much about being hyper secure with the key material. (they're sacrifical keys so we can learn with).
+Alternatively if we can use the python library to create Codex32 valid keys, we can use that as a shortcut as manually creating keys takes about 1-2 hours each.
+note: I don't want the device to create Codex32 secrets. That should be done totally offline by hand using pencil, paper, dice and patience.
+
+Once I have my "test" keys all prepared, then we can begin building the functionality. 
+MVP must-haves:
+ - For the user to be able to enter their secret (Codex32 S share) into the device (in this case the terminal, but later the seedsigner)
+ - I want to be able to verify that the user-entered Codex32 key is a valid key or not, based on the checksum. - we MUST support detection of errors using the codex32 checksum algorithm. Once the S share string is fully entered, the wallet MUST validate the checksum and header before accepting it.
+ - I would like the tool to use the S share Codex32 key to generate a deterministic valid BIP39 seed phrase and display it to the user on the terminal
+ From the Codex32 wallets.md guide - The master seed should be used directly as a master seed, as specified in BIP32. Unlike in BIP39 or other specifications, no PBKDF or other pre-processing should be applied.
+
+We want to use this python library for Codex32 - https://github.com/benwestgate/python-codex32
+
+Notes from the wallets.md file from Codex32's github -
+
+We will not work on reconstructing threshold number of SSSS shares into the recovere S share secret in the MVP, but it will be a v2 feature along with error correction.
+We will not work on error correction until our MVP is functional, but here is the info from the wallets.md guide
+Error Detection and Correction
+Wallets MUST support detection of errors using the codex32 checksum algorithm. Wallets SHOULD additionally support error correction; such wallets are referred to as "error-correcting wallets (ECWs)" and have additional requirements.
+
+An ECW:
+
+MUST support correction of up to 4 substitution errors and erasures; (we will implement this)
+MAY also support correction of up to 8 erasures, up to 13 if contiguous; (we may implement this)
+MAY support correction of further errors, including insertion or deletion errors. (we won't implement this)
+If a wallet is unable to meet these specifications, it is not an ECW and it SHOULD NOT expose error-correction functionality to the user.
+
+I found this seedsigner emulator which we may be able to use to begin migrate from terminal to the actual seedsigner project. 
+Specifically we can use it to get the user flow down in the seedsigner UI, and customize the keyboard to grey-out non-Bech32 characters, so the users cannot select them when entering their Codex32 keys manually into the device.
+https://github.com/enteropositivo/seedsigner-emulator/
+
+I want to create a tool that can accept the user entry for the 48 Codex32 seed characters (This is a 128 bit key, there is a 74-character Codex32 string for 256 bit keys but we won't support that in the MVP, only the 48 character/128 bit keys).
+Since Codex32 worksheets that a user would use to create and verify secret shares have a concept of "boxes" we probably want to copy that idea to make user entry easier.
+So the idea is that the user will have their Codex32 secret on a worksheet, and the worksheet has each character in a numbered "box" (Boxes 1 through 48)
+We will prompt the user to enter the 48 characters box by box, and they will transcribe from their worksheet exactly.
+This example shows the codex32 format, when used without splitting the secret into any shares. The payload contains 26 bech32 characters, which corresponds to 130 bits. We truncate the last two bits in order to obtain a 128-bit master seed.
+
+codex32 secret (bech32): ms10testsxxxxxxxxxxxxxxxxxxxxxxxxxx4nzvca9cmczlw
+
+Master secret (hex): 318c6318c6318c6318c6318c6318c631
+
+Boxes 1-2   human-readable part: ms
+Box 3		separator: 1
+Box 4		k value: 0 (no secret splitting)
+Boxes 5-8   identifier: test
+Box 9	    share index: s (the secret)
+Boxes 10-35    payload: xxxxxxxxxxxxxxxxxxxxxxxxxx
+Boxes 36-48    checksum: 4nzvca9cmczlw
+
+Please help create a detailed implementation plan for our MVP and then the v2 (error correction and share reconstruction). We want the project to built in a way that is compatible with the seedsigner architecture, but we won't worry about any UI or controlled integration at all now, just build out a working terminal tool first and then build V2 and finally work on seedsigner integration.
+I am working in a Windows 10 environment (Powershell within Windsurf AI), please describe a complete environment set up for our development workspace of the terminal tool, and incremental steps to build it out.

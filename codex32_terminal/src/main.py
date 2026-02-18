@@ -1,39 +1,42 @@
-"""Minimal terminal CLI for codex32 -> BIP39 conversion."""
+"""Terminal CLI for Codex32-native BIP32 workflow."""
 
 from __future__ import annotations
 
-import sys
+import argparse
 
 import controller
-from model import Codex32InputError, codex32_to_mnemonic, codex32_to_seed_bytes
 
 
-def read_input() -> str:
-    """Read codex32 input from CLI args or prompt."""
-    if len(sys.argv) > 1:
-        return "".join(sys.argv[1:])
-    return ""
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Codex32-native terminal workflow")
+    parser.add_argument(
+        "share",
+        nargs="?",
+        help="Optional initial codex32 share (S-share or split share) to start from.",
+    )
+    parser.add_argument(
+        "--full",
+        action="store_true",
+        help="Use full-share paste mode instead of box-by-box entry.",
+    )
+    parser.add_argument(
+        "--network",
+        default="mainnet",
+        choices=["mainnet", "testnet4"],
+        help="Descriptor/xpub network (default: mainnet).",
+    )
+    return parser.parse_args()
 
 
 def main() -> int:
     """CLI runner."""
-    if "--full" in sys.argv:
-        return controller.run(entry_mode="full")
-    codex_str = read_input()
-    if not codex_str:
-        return controller.run(entry_mode="box")
-    try:
-        seed_bytes = codex32_to_seed_bytes(codex_str)
-        mnemonic = codex32_to_mnemonic(codex_str)
-    except Codex32InputError as exc:
-        print(f"Error: {exc}")
-        return 1
-
-    print("\nCodex32 S-share accepted.")
-    print(f"Seed (hex): {seed_bytes.hex()}")
-    print(f"BIP39 mnemonic: {mnemonic}")
-    print("Note: This mnemonic is a display encoding of the BIP32 seed; no PBKDF2 is used.")
-    return 0
+    args = parse_args()
+    entry_mode = "full" if args.full else "box"
+    return controller.run(
+        entry_mode=entry_mode,
+        network=args.network,
+        initial_share=args.share,
+    )
 
 
 if __name__ == "__main__":
