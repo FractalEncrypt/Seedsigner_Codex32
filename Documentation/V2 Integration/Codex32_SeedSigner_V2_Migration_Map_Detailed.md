@@ -264,6 +264,7 @@ Set this during Codex32 entry/recovery before pending seed finalization.
 - Implement Codex32 branch in `SeedBackupView`.
 - Persist Codex32 secret metadata in `Codex32Seed` creation path.
 - Validate no regressions in non-Codex32 backup behavior.
+- Local Windows test note: if `pyzbar` import fails after `.venv` rebuild, run `SeedSigner/tools/windows_patch_pyzbar_msvcr120.ps1` (documented in `SeedSigner/docs/developer_tips.md`) before flow-test execution.
 
 ### Phase 2: PSBT robustness parity with terminal V2
 - Update finalize flow to preserve metadata.
@@ -273,6 +274,23 @@ Set this during Codex32 entry/recovery before pending seed finalization.
 ### Phase 3: Documentation + polish
 - Update integration docs and user-facing notes.
 - Capture coordinator export guidance for missing UTXO cases.
+
+### Current implementation status (2026-02-18)
+- **Phase 1 complete**
+  - Codex32 secret metadata persists on `Codex32Seed`.
+  - Backup menu is Codex32-specific with unavailable fallback warning.
+  - Local Windows pyzbar helper added: `SeedSigner/tools/windows_patch_pyzbar_msvcr120.ps1`.
+- **Phase 2 complete**
+  - `PSBTFinalizeView` now preserves full signed PSBT metadata (no trim-before-export path).
+  - Parser-level missing-UTXO guard added via `MissingInputUtxoError` + user-facing warning route.
+- **Phase 3 complete**
+  - Integration docs updated to reflect implemented PSBT behavior and validation snapshot.
+  - Coordinator export guidance added for missing-UTXO recovery workflow.
+- **Targeted validation passes**
+  - `tests/test_seed.py` (Codex32 metadata/duplicate-preservation cases)
+  - `tests/test_flows_seed.py -k "codex32_backup"`
+  - `tests/test_psbt_parser.py`
+  - `tests/test_flows_psbt.py`
 
 ---
 

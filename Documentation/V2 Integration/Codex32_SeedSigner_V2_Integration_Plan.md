@@ -32,33 +32,35 @@ Relevant current implementation:
 
 So for Codex32, QR transport is already there. The main work is signing-flow correctness and Codex32 seed UX integration.
 
-## 3) Current SeedSigner behavior to revisit
+## 3) SeedSigner V2 behavior now implemented
 In SeedSigner PSBT finalize flow:
-- `psbt.sign_with(psbt_parser.root)` signs correctly.
-- Then `PSBTParser.trim(psbt)` is used before display/export.
+- `psbt.sign_with(psbt_parser.root)` signs on the original PSBT object.
+- Signed export now keeps full PSBT metadata by default (no trim-before-export path).
 
-This trim behavior currently drops most per-input metadata and keeps only signatures/final witness. That can break downstream sequential multisig signing in some toolchains because later signers may require `witness_utxo` / `non_witness_utxo`.
+Parser-side guardrails:
+- `PSBTParser.get_inputs_missing_utxo()` detects inputs missing both `witness_utxo` and `non_witness_utxo`.
+- `MissingInputUtxoError` is raised early during parsing.
+- UI route displays a clear warning and exits to main menu without crash.
 
 Relevant code:
-- `SeedSigner/src/seedsigner/views/psbt_views.py` (`PSBTFinalizeView.run`)
-- `SeedSigner/src/seedsigner/models/psbt_parser.py` (`trim`)
+- `SeedSigner/src/seedsigner/views/psbt_views.py` (`PSBTOverviewView`, `PSBTFinalizeView`, `PSBTMissingInputUtxoWarningView`)
+- `SeedSigner/src/seedsigner/models/psbt_parser.py` (`MissingInputUtxoError`, `get_inputs_missing_utxo`)
 
-## 4) Recommended V2 changes (SeedSigner)
+## 4) Implemented V2 changes (SeedSigner)
 
-### Priority A - Signing robustness
+### Priority A - Signing robustness (completed)
 1. **Preserve full PSBT metadata after signing**
-   - Replace unconditional trim-on-sign with full PSBT retention for export (or at least for multisig paths).
-   - Keep an optional compact mode only if explicitly needed for QR size constraints.
+   - Trim is no longer used by default during finalize/export path.
+   - Signed PSBT remains handoff-safe for sequential cosigners.
 
-2. **Add explicit missing-UTXO precheck before signing**
-   - For each input, verify `inp.utxo` (or equivalent witness/non-witness UTXO availability).
-   - If missing, show actionable error:
-     - "PSBT missing witness_utxo/non_witness_utxo for input(s) X. Re-export with full input data."
+2. **Add explicit missing-UTXO precheck before signing/parse flow**
+   - Missing UTXO inputs are detected during parser initialization.
+   - Missing data now triggers actionable warning instead of runtime crash.
 
 3. **Keep no-op signing detection**
-   - If signature count does not increase after signing, keep existing error flow and improve message context (wrong signer / already signed / mismatch key origin).
+   - Signature count delta check remains active and routes to existing signing-failed UX.
 
-### Priority B - Codex32 + PSBT flow alignment
+### Priority B - Codex32 + PSBT flow alignment (completed)
 4. **Ensure Codex32Seed is first-class in PSBT signer selection**
    - Confirm Codex32 seeds appear cleanly in `PSBTSelectSeedView` and fingerprint matching logic.
    - Confirm no passphrase assumptions leak into PSBT signing path.
@@ -66,7 +68,7 @@ Relevant code:
 5. **Descriptor-based multisig verification compatibility**
    - Confirm change-verification logic works identically for Codex32 seeds when multisig descriptor is loaded.
 
-### Priority C - UX copy and guardrails
+### Priority C - UX copy and guardrails (completed)
 6. **Improve user-facing guidance for incomplete PSBTs**
    - Suggest coordinator export settings (include full input data / UTXOs).
    - Keep messages short and operational.
@@ -74,17 +76,17 @@ Relevant code:
 7. **Optional: handoff mode label**
    - If retaining full PSBT increases QR length, label this as "multisig handoff-safe" behavior.
 
-## 5) Suggested file touchpoints
+## 5) Implemented file touchpoints
 - `SeedSigner/src/seedsigner/views/psbt_views.py`
-  - Update `PSBTFinalizeView.run` signing/export behavior.
+  - `PSBTFinalizeView.run` preserves full signed PSBT metadata.
+  - `PSBTOverviewView` handles missing-UTXO parser exception.
+  - Added `PSBTMissingInputUtxoWarningView`.
 - `SeedSigner/src/seedsigner/models/psbt_parser.py`
-  - Add helper for missing-UTXO detection.
-  - Potentially keep `trim()` but stop using it by default for multisig handoff.
-- `SeedSigner/src/seedsigner/gui` warning/error screens (if needed)
-  - Add a dedicated message for missing UTXO details.
+  - Added `MissingInputUtxoError` and `get_inputs_missing_utxo()` helper.
+  - Kept `trim()` for optional/future compact mode use, but not default finalize path.
 - Tests:
-  - PSBT signing tests for preserved metadata and sequential signer handoff.
-  - Error-path tests for missing UTXO fields.
+  - `tests/test_psbt_parser.py` includes missing-UTXO detection/exception coverage.
+  - `tests/test_flows_psbt.py` includes missing-UTXO warning route coverage.
 
 ## 6) Test plan for V2 integration
 
@@ -107,11 +109,34 @@ Relevant code:
 - Nunchuk / Specter / coordinator variants where possible
 - Large QR payload behavior at low/medium/high QR density
 
-## 7) Decision log (recommended defaults)
+## 7) Coordinator export guidance for missing-UTXO cases
+
+When SeedSigner reports missing UTXO input data, re-export the PSBT from the coordinator with complete input context.
+
+Coordinator-agnostic checklist:
+1. Export **PSBT** (not finalized transaction hex).
+2. Enable any option equivalent to:
+   - include full input data,
+   - include previous transaction,
+   - include witness UTXO / non-witness UTXO.
+3. Re-import the newly exported PSBT and re-run signing.
+
+Notes:
+- For multisig handoff, preserving UTXO metadata is required so subsequent signers can validate/sign.
+- If your coordinator has both "compact" and "full" PSBT export modes, use **full**.
+
+## 8) Decision log (recommended defaults)
 - Default signed PSBT export should be **handoff-safe** (metadata preserved).
 - QR support stack remains unchanged (reuse existing SeedSigner decoders/encoders).
 - Missing UTXO should be treated as a user-actionable data-quality error, not an internal exception.
 
-## 8) Implementation status snapshot
+## 9) Implementation status snapshot
 - Terminal reference implementation: validated for 2-of-3 sequential signing and network broadcast.
-- SeedSigner integration: Codex32 seed entry exists; PSBT QR stack exists; signing export semantics need V2 adjustment for robust multisig handoff.
+- SeedSigner integration: Phase 1 and Phase 2 changes are implemented and validated in host tests.
+- Local Windows test helper documented for pyzbar MSVCR120 dependency patch (`tools/windows_patch_pyzbar_msvcr120.ps1`).
+
+Validation snapshot (host):
+- `tests/test_psbt_parser.py`
+- `tests/test_flows_psbt.py`
+- `tests/test_seed.py` (Codex32 metadata-related cases)
+- `tests/test_flows_seed.py -k "codex32_backup"`
