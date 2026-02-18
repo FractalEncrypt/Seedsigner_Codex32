@@ -1,0 +1,26 @@
+
+## Windows: local `pyzbar` DLL patch helper (test env only)
+
+If `pytest` collection fails on Windows with `pyzbar`/`libzbar-64.dll` import errors, your local environment may be missing `MSVCR120.dll` where `pyzbar` can load it.
+
+Use this one-shot helper script to re-apply the local fix after rebuilding `.venv`:
+
+```powershell
+pwsh -ExecutionPolicy Bypass -File .\tools\windows_patch_pyzbar_msvcr120.ps1
+```
+
+Optional override if auto-detection fails:
+
+```powershell
+pwsh -ExecutionPolicy Bypass -File .\tools\windows_patch_pyzbar_msvcr120.ps1 -SourceDll "C:\full\path\to\msvcr120.dll"
+```
+
+Then re-run targeted flow tests:
+
+```powershell
+.\.venv\Scripts\python -m pytest tests\test_flows_seed.py -k "codex32_backup"
+```
+
+Notes:
+- This is a **local dev environment patch** (not firmware/runtime behavior).
+- Keep this uncommitted unless the team decides to formalize a cross-platform setup step.
