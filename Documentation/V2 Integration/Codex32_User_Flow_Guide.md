@@ -26,27 +26,28 @@ SeedSigner is used to **verify** and recover from hand-calculated shares. It doe
 
 2. `Codex32EntryView` (manual character entry in numbered boxes)
 3. `ScanCodex32ShareView` (camera scan for Codex32 share)
-4. `Codex32ShareInvalidView` (invalid header/data/length/checksum)
+4. `Codex32ShareInvalidView` (invalid header/data/length/checksum, or share-set mismatch)
 5. `Codex32ShareConflictConfirmView` (same index, different share)
 6. `Codex32ShareSuccessView` (share accepted, continue flow)
 7. `Codex32DiscardAllSharesConfirmView`
-8. `Codex32MasterShareSuccessView` (threshold reached, `S` recovered or validated)
-9. `Codex32MasterSecretWarningView`
-10. `Codex32MasterSecretDisplayView` (Boxes 1-24, then 25-48)
+8. `Codex32ShareEntryMethodView` (choose enter vs scan after discard)
+9. `Codex32MasterShareSuccessView` (threshold reached, `S` recovered or validated)
+10. `Codex32MasterSecretWarningView`
+11. `Codex32MasterSecretDisplayView` (Boxes 1-24, then 25-48)
 
 ## Backup/export after seed is loaded
 
-11. `SeedBackupView` (Codex32 options appear for Codex32Seed)
-12. `Codex32BackupShareSelectView` (choose `S` or split share QR export)
-13. `Codex32BackupUnavailableView` (if export metadata is missing/inconsistent)
-14. `SeedTranscribeSeedQRWarningView` (Codex32QR warning path)
-15. `SeedTranscribeSeedQRWholeQRView`
-16. `SeedTranscribeSeedQRZoomedInView`
-17. `SeedTranscribeSeedQRConfirmQRPromptView` (Confirm Codex32QR)
-18. `SeedTranscribeSeedQRConfirmScanView`
-19. `SeedTranscribeSeedQRConfirmWrongSeedView`
-20. `SeedTranscribeSeedQRConfirmInvalidQRView`
-21. `SeedTranscribeSeedQRConfirmSuccessView`
+12. `SeedBackupView` (Codex32 options appear for Codex32Seed)
+13. `Codex32BackupShareSelectView` (choose `S` or split share for QR export or manual display)
+14. `Codex32BackupUnavailableView` (if export metadata is missing/inconsistent)
+15. `SeedTranscribeSeedQRWarningView` (Codex32QR warning path)
+16. `SeedTranscribeSeedQRWholeQRView`
+17. `SeedTranscribeSeedQRZoomedInView`
+18. `SeedTranscribeSeedQRConfirmQRPromptView` (Confirm Codex32QR)
+19. `SeedTranscribeSeedQRConfirmScanView`
+20. `SeedTranscribeSeedQRConfirmWrongSeedView`
+21. `SeedTranscribeSeedQRConfirmInvalidQRView`
+22. `SeedTranscribeSeedQRConfirmSuccessView`
 
 ---
 
@@ -80,10 +81,14 @@ When a share is submitted, SeedSigner validates:
 
 If invalid -> `Codex32ShareInvalidView`
 
+If the share header doesn’t match the current share set (threshold/identifier),
+the error explicitly calls out the **share-set mismatch** (rather than just a
+generic “invalid header”).
+
 User choices there:
 
 1. **Review & edit** (fix the entered characters)
-2. **Discard invalid share** (re-enter same share slot from blank)
+2. **Discard invalid share** (choose whether to **enter or scan** the next share)
 3. **Discard all shares**
 
 This preserves the trustless process: the user fixes worksheet/math/input; SeedSigner does not generate a substitute checksum share.
@@ -97,6 +102,9 @@ After each valid share, `Codex32ShareSuccessView` offers:
 3. **Discard**
 
 So users can alternate manual + scan for each subsequent share.
+
+The success screen **preselects** Enter vs Scan based on how the last share was
+entered (smoothly continuing the user’s preferred entry method).
 
 ### Duplicate index conflict path
 
@@ -142,6 +150,8 @@ After `Finalize`, user lands in `SeedOptionsView` and can use the seed like any 
 For Codex32 backups specifically:
 
 - `Backup seed -> View Codex32 Secret` (display in numbered boxes)
+  - If multiple shares are available, `Codex32BackupShareSelectView` lets the user choose
+    which share to display (S share or split share).
 - `Backup seed -> Export as Codex32QR`
   - If multiple shares available, `Codex32BackupShareSelectView` lets user choose which share QR to transcribe/export.
 
