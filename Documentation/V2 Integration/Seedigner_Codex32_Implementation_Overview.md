@@ -25,9 +25,9 @@ Even those bitcoiners rolling dice, using seed picker cards, or other manual met
 By combining Codex32 and SeedSigner, we establish a **Trustless Analog-to-Digital Bridge**:
 
 1. **Analog Generation:** You generate your Codex32 master secret and split shares entirely offline, using dice and paper worksheets. You calculate the checksums yourself. No silicon, no electricity, no potential for malware.
-2. **Stateless Digital Signing:** When you need to receive or spend Bitcoin, you temporarily bring your analog key into the digital realm by entering it into the SeedSigner. The Seedsigner works with a coordinator software to create a watch-only wallet on an internet connected device. This device never touches your seed, it remains on the Seedsigner. The coordinator allows you to send and receive bitcoin, and talks to the Seedsigner over the airgap using cameras and QR codes. The SeedSigner uses the key to sign your transaction (PSBT), and as soon as you pull the power cord, the device suffers total amnesia. 
+2. **Stateless Digital Signing:** When you need to receive or spend Bitcoin, you temporarily bring your analog key into the digital realm by entering it into the SeedSigner. You interact with an internet connected watch-only wallet over airgap. The seed never touches an internet connected device. Once you are done, as soon as you pull the power cord, the seed is completely wiped from the Seedsigner. 
 
-This integration means you can rely on the unhackable nature of paper and math for your long-term cold storage, while retaining the convenience of an electronic signer when you actually need to move funds.
+This integration means you can rely on the unhackable nature of paper and math to create  your Bitcoin seed, while retaining the convenience of an electronic signer when you actually need to move funds.
 
 ---
 
@@ -49,7 +49,35 @@ Even though it looks like random letters, it is highly structured:
 - **The Checksum**: The final characters, mathematically derived from the rest of the string to detect errors.
 
 ### Split-Sharing (k-of-N)
-If you want to secure your Bitcoin such that losing one backup doesn't lose your funds, Codex32 lets you split the secret. For example, a 2-of-3 setup creates Share A, Share C, and Share D. Any two of those shares can be mathematically combined to reconstruct the Master Secret (`S` share).
+If you want to secure your Bitcoin such that losing one backup doesn't cause complete loss of funds, Codex32 lets you split the secret. For example, a 2-of-3 setup creates Share A, Share C, and Share D. Any two of those shares can be mathematically combined to reconstruct the Master Secret (`S` share).
+
+### 3.1 Conceptual Walkthrough: How the Codex32 Flow Works in Practice
+
+In our implementation, the process is intentionally **paper-first** and **air-gapped**:
+
+1. **Create the seed by hand (offline)**
+   - The user starts with paper, pencil, and dice.
+   - They manually create Codex32 share data (most often as split shares, e.g., k-of-n).
+
+2. **Verify and recover on SeedSigner**
+   - The user enters or scans their manually created shares into SeedSigner.
+   - SeedSigner validates each share (format/checksum), then reconstructs/derives the master secret (`S` share) once enough valid shares are present.
+
+3. **Load seed + create durable backups**
+   - Once loaded, the user can back up:
+     - each split share, and/or
+     - the derived `S` share.
+   - Backups can be transcribed as Codex32QR by hand first, then verified.
+
+4. **Export watch-only wallets**
+   - The user exports watch-only wallet data (single-sig or multisig) to coordinator software (e.g., Sparrow and compatible mobile wallets such as SeedKeeper, Nunchuk, and BlueWallet).
+
+5. **Receive and spend with separation of duties**
+   - After watch-only setup, the coordinator can generate receive addresses and track balances **without loading private seed material**.
+   - To spend, the user loads the seed into SeedSigner (manual entry or QR), signs the transaction offline, then broadcasts from the watch-only coordinator.
+
+6. **Finalize long-term storage**
+   - After backup verification, the user can transfer final backups to metal for long-term, resilient storage.
 
 ---
 
@@ -79,11 +107,97 @@ Once the `S` share is successfully recovered (or directly entered), SeedSigner l
 - Generate and verify receive addresses.
 - **Export Backups:** The user can navigate to the Backup menu and export the `S` share, or any of the entered split shares, visually on the screen or as a dynamically generated Codex32QR code to be transcribed onto paper or etched into metal.
 
+### 4.5. Codebase overview (SeedSigner Changes)
+
+The Codex32 integration was implemented as a focused extension of SeedSigner’s existing seed, QR, and PSBT pipelines.  
+Rather than introducing a parallel architecture, we added Codex32-specific logic at key model and view boundaries while preserving existing behavior for BIP39/SeedQR users.
+
+#### Core Domain & Validation Layer
+
+- **[src/seedsigner/models/codex32.py](cci:7://file:///c:/Users/FractalEncrypt/Documents/Windsurf/SeedSigner/src/seedsigner/models/codex32.py:0:0-0:0)**
+  - Defines Codex32 parsing/normalization and strict input validation.
+  - Locks the Codex32QR profile contract (canonical `MS1` prefix, fixed-length share payload, and QR profile constants).
+  - Implements `Codex32ShareCollection`, which manages split-share collection, conflict handling, recoverability checks, and export metadata generation.
+
+- **[src/seedsigner/models/seed.py](cci:7://file:///c:/Users/FractalEncrypt/Documents/Windsurf/SeedSigner/src/seedsigner/models/seed.py:0:0-0:0)**
+  - Adds [Codex32Seed](cci:2://file:///c:/Users/FractalEncrypt/Documents/Windsurf/SeedSigner/src/seedsigner/models/seed.py:179:0-232:48) as a seed type backed by the recovered 16-byte entropy.
+  - Preserves Codex32-specific metadata needed for backup/export UX (`master_share`, export-share map, source map).
+  - Explicitly keeps Codex32 seeds passphrase-free to match the Codex32 model.
+
+- **[src/seedsigner/models/seed_storage.py](cci:7://file:///c:/Users/FractalEncrypt/Documents/Windsurf/SeedSigner/src/seedsigner/models/seed_storage.py:0:0-0:0)**
+  - Updates duplicate-seed handling so reloading an equivalent Codex32 seed can enrich existing stored metadata instead of discarding it.
+
+#### QR Decode/Encode Integration
+
+- **`src/seedsigner/models/qr_type.py`**
+  - Introduces a dedicated Codex32 QR type used consistently by decoder and routing logic.
+
+- **[src/seedsigner/models/decode_qr.py](cci:7://file:///c:/Users/FractalEncrypt/Documents/Windsurf/SeedSigner/src/seedsigner/models/decode_qr.py:0:0-0:0)**
+  - Adds Codex32 detection and canonical decode output through a dedicated Codex32 decoder path.
+  - Enforces fail-closed behavior for invalid Codex32-like payloads (prevents accidental fallback into unrelated QR types such as bitcoin address parsing).
+
+- **[src/seedsigner/models/encode_qr.py](cci:7://file:///c:/Users/FractalEncrypt/Documents/Windsurf/SeedSigner/src/seedsigner/models/encode_qr.py:0:0-0:0)**
+  - Adds `Codex32QrEncoder` to produce deterministic, canonical Codex32 share payloads for display/export.
+
+#### UX and Flow Wiring (Views)
+
+- **[src/seedsigner/views/scan_views.py](cci:7://file:///c:/Users/FractalEncrypt/Documents/Windsurf/SeedSigner/src/seedsigner/views/scan_views.py:0:0-0:0)**
+  - Extends scan routing so Codex32 shares can enter either direct success flow (`S` share) or multi-share collection flow (non-`S` shares).
+  - Adds a dedicated collection scan view for iterative share intake.
+
+- **[src/seedsigner/views/seed_views.py](cci:7://file:///c:/Users/FractalEncrypt/Documents/Windsurf/SeedSigner/src/seedsigner/views/seed_views.py:0:0-0:0)**
+  - Extends load-seed menu with Codex32 entry/scan options.
+  - Implements Codex32 manual entry flow, share conflict confirmation, and collection progression.
+  - Specializes backup UX for Codex32 with:
+    - view master secret (when available),
+    - export as Codex32QR,
+    - share-selection UI for multi-share seeds,
+    - source-aware labeling (e.g., derived `S` share),
+    - unavailable-state routing when metadata is insufficient.
+  - Integrates Codex32 into transcribe-and-confirm scan verification flow with canonical string comparison.
+
+#### PSBT Robustness (Supporting Work in Same Branch)
+
+- **[src/seedsigner/models/psbt_parser.py](cci:7://file:///c:/Users/FractalEncrypt/Documents/Windsurf/SeedSigner/src/seedsigner/models/psbt_parser.py:0:0-0:0)**
+  - Adds explicit missing-UTXO detection and dedicated parser error signaling.
+
+- **[src/seedsigner/views/psbt_views.py](cci:7://file:///c:/Users/FractalEncrypt/Documents/Windsurf/SeedSigner/src/seedsigner/views/psbt_views.py:0:0-0:0)**
+  - Routes missing-UTXO parse failures to user-facing warning flow.
+  - Finalize/sign path preserves PSBT metadata by avoiding destructive trimming in the signed export flow.
+
+#### Regression & Integration Test Coverage
+
+- **[tests/test_decodepsbtqr.py](cci:7://file:///c:/Users/FractalEncrypt/Documents/Windsurf/SeedSigner/tests/test_decodepsbtqr.py:0:0-0:0)**: Codex32 decode canonicalization, invalid checksum handling, and precedence regressions.
+- **[tests/test_scan_views.py](cci:7://file:///c:/Users/FractalEncrypt/Documents/Windsurf/SeedSigner/tests/test_scan_views.py:0:0-0:0)**: non-`S` scan routing into collection-mode entry.
+- **[tests/test_flows_seed.py](cci:7://file:///c:/Users/FractalEncrypt/Documents/Windsurf/SeedSigner/tests/test_flows_seed.py:0:0-0:0)**: end-to-end collection, conflict replacement, backup/export menus, share selection, and confirm-scan roundtrip.
+- **[tests/test_seedqr.py](cci:7://file:///c:/Users/FractalEncrypt/Documents/Windsurf/SeedSigner/tests/test_seedqr.py:0:0-0:0)**: Codex32 QR rendering profile expectations.
+- **[tests/test_psbt_parser.py](cci:7://file:///c:/Users/FractalEncrypt/Documents/Windsurf/SeedSigner/tests/test_psbt_parser.py:0:0-0:0) + [tests/test_flows_psbt.py](cci:7://file:///c:/Users/FractalEncrypt/Documents/Windsurf/SeedSigner/tests/test_flows_psbt.py:0:0-0:0)**: missing-UTXO detection and warning flow coverage.
+
+### 4.6. Scope Boundaries: Practical Subset of BIP93
+
+Our SeedSigner implementation intentionally does **not** implement the full Codex32 space described in BIP93.
+
+#### What we support today
+- **48-character Codex32 strings only** (the fixed-length profile used by our Codex32QR workflow).
+- **Up to 5 split shares** in collection/export workflows.
+
+#### Why this scope is intentional
+- The official Codex32 workbook worksheets in common circulation are focused on constructing and verifying the **48-character format**.
+- Existing Codex32 guidance recommends avoiding unnecessarily large split-share sets, and in practice the strongest guidance centers around keeping share counts modest (with 5 as a practical upper bound).
+
+#### Future expansion path
+This is a deliberate product boundary, not a protocol limitation.  
+If we see meaningful real-world demand for larger share sets, higher thresholds, or longer Codex32 string formats, we can extend support in a future iteration.
+
+---
+
+This structure keeps Codex32 support modular and testable while preserving SeedSigner’s existing seed and signing UX for non-Codex32 users.
+
 ---
 
 ## 5) Conclusion
 
-The SeedSigner + Codex32 integration represents a massive leap forward for analog self-custody. By strictly adhering to the mathematical constraints of Codex32 while leveraging the stateless, optical air-gap of SeedSigner, we have created a workflow where a user can generate a seed phrase entirely offline by hand, perfectly verify its math without a computer, and securely use it to sign transactions without ever putting the master key on a persistent, internet-connected device. 
+The SeedSigner + Codex32 integration represents a massive leap forward for analog self-custody. By strictly adhering to the mathematical constraints of Codex32 while leveraging the stateless, optical air-gap of SeedSigner, we have created a workflow where a user can generate a seed phrase entirely offline by hand, perfectly verify its math without a computer, and securely use it to sign transactions without ever exposing the master key to a persistent, internet-connected device.
 
 This implementation brings the "don't trust, verify" ethos to the very generation and storage of the private key itself.
 
