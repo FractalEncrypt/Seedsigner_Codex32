@@ -84,3 +84,8 @@ Once the `S` share is successfully recovered (or directly entered), SeedSigner l
 The SeedSigner + Codex32 integration represents a massive leap forward for analog self-custody. By strictly adhering to the mathematical constraints of Codex32 while leveraging the stateless, optical air-gap of SeedSigner, we have created a workflow where a user can generate a seed phrase entirely offline by hand, perfectly verify its math without a computer, and securely use it to sign transactions without ever putting the master key on a persistent, internet-connected device. 
 
 This implementation brings the "don't trust, verify" ethos to the very generation and storage of the private key itself.
+
+---
+
+## 6) Acknowledgements
+A deep thanks for extremely valuable guidance and insights from Anrew Polestra, Dr. Pearlwort Snead, Ben Westgate, and "Bitcoin Butlers" that helped bring this project from thought into reality.
