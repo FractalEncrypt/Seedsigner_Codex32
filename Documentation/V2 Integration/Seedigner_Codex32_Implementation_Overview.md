@@ -2,15 +2,15 @@
 
 ## 1) Introduction
 
-As Bitcoin self-custody evolves, the standard for what it means to be a "sovereign user" continues to rise. For years, the gold standard has been hardware wallets using BIP39 seed phrases. However, two powerful tools have emerged that challenge this paradigm by removing trust in electronics and persistent memory: **SeedSigner** and **Codex32**.
+As Bitcoin self-custody evolves, the standard for what it means to be a sovereign user continues to evolve. For years, the gold standard has been hardware wallets using BIP39 seed phrases. However, two powerful tools have emerged that challenge this paradigm by removing trust in electronics and persistent memory: **SeedSigner** and **Codex32**.
 
 This document explains what these tools are, why bringing them together creates a uniquely powerful self-custody model, and exactly how we implemented this integration.
 
 ### What is SeedSigner?
-SeedSigner is a DIY, air-gapped, and **stateless** Bitcoin signing device. Built from off-the-shelf, general-purpose components (like a Raspberry Pi Zero), it is designed to be assembled by the user, removing supply chain risks associated with specialized hardware wallets. Because it is stateless, it forgets everything the moment it is turned off. It holds no memory of your keys, meaning a physical theft of the device compromises nothing.
+SeedSigner is a DIY, air-gapped, and **stateless** Bitcoin signing device. Built from off-the-shelf, general-purpose components (like a Raspberry Pi Zero), it is designed to be assembled by the user, removing supply chain risks associated with specialized hardware wallets. Because it is stateless, it forgets everything the moment it is turned off. It holds no memory of your keys, meaning a physical theft of the device compromises nothing. It is a completely airgapped bitcoin swiss army knife that never connects to wifi or bluetooth. You seeds never touch an internet connected device, and never are stored in a persistent memory.
 
 ### What is Codex32?
-Codex32 (BIP93) is a cryptographic standard for generating, verifying, and splitting Bitcoin master seeds using only **pencil, paper, and dice**. It uses a human-readable format and incorporates a robust checksum (like Bech32 Bitcoin addresses). More importantly, it uses a form of Shamir's Secret Sharing (SSSS) designed to be calculated by hand, allowing users to split a master secret into multiple shares without ever typing the secret into a computer.
+Codex32 (BIP93) is a cryptographic standard for generating, verifying, and splitting Bitcoin master seeds using only **pencil, paper, and dice**. It uses a human-readable format and incorporates a robust checksum (like Bech32 Bitcoin addresses). More importantly, it uses a form of Shamir's Secret Sharing (SSSS) designed to be calculated by hand, allowing users to create and split a master secret into multiple shares without ever typing the secret into a computer.
 
 ---
 
@@ -18,12 +18,14 @@ Codex32 (BIP93) is a cryptographic standard for generating, verifying, and split
 
 True self-custody requires removing blind trust in hardware and software. 
 
-When you use a traditional hardware wallet to generate a seed phrase, you are trusting the device's random number generator (RNG) and its software. If the device is compromised, your Bitcoin is at risk. 
+Almost without exception, every single person who's created a bitcoin seed has trusted an electronic device to do it. When you use a traditional hardware wallet to generate a seed phrase, you are trusting the device's random number generator (RNG) and its software. If the device is compromised, your Bitcoin is at risk. 
+
+Even those bitcoiners rolling dice, using seed picker cards, or other manual methods always enter their seed entropy into an electonic device to perform the BIP39 math to create the "last word" (the 12th or 24th words in most standard implementations). This means that even if you've manually created most of the key, it can't be finalized until you run it thorough an electronic device. Don't get me wrong, these are my people, I'm just calling it like it is.
 
 By combining Codex32 and SeedSigner, we establish a **Trustless Analog-to-Digital Bridge**:
 
 1. **Analog Generation:** You generate your Codex32 master secret and split shares entirely offline, using dice and paper worksheets. You calculate the checksums yourself. No silicon, no electricity, no potential for malware.
-2. **Stateless Digital Signing:** When you need to spend Bitcoin, you temporarily bring your analog key into the digital realm by entering it into the SeedSigner. The SeedSigner uses the key to sign your transaction (PSBT), and as soon as you pull the power cord, the device suffers total amnesia. 
+2. **Stateless Digital Signing:** When you need to receive or spend Bitcoin, you temporarily bring your analog key into the digital realm by entering it into the SeedSigner. The Seedsigner works with a coordinator software to create a watch-only wallet on an internet connected device. This device never touches your seed, it remains on the Seedsigner. The coordinator allows you to send and receive bitcoin, and talks to the Seedsigner over the airgap using cameras and QR codes. The SeedSigner uses the key to sign your transaction (PSBT), and as soon as you pull the power cord, the device suffers total amnesia. 
 
 This integration means you can rely on the unhackable nature of paper and math for your long-term cold storage, while retaining the convenience of an electronic signer when you actually need to move funds.
 
@@ -35,13 +37,13 @@ Codex32 relies on finite field math (specifically Galois Field 32) that has been
 
 ### Anatomy of a Codex32 Share
 A standard Codex32 share we implemented is a 48-character string that looks something like this:
-`MS12WSFPARFG0AFNHER0NAE08R0FNA0EFN83WMZT0A5AP6ZK`
+`MS12L0VEAARWENFLUFFYTAFLCATQTTGGERGGM0C6A8FRJE57`
 
 Even though it looks like random letters, it is highly structured:
 - **`MS`** (Human-readable part): Identifies this as a Master Seed string.
 - **`1`**: A separator.
 - **`2`** (Threshold `k`): The number of shares needed to recover the secret (in this case, 2). If this is `0`, the string is a single un-split master secret.
-- **`WSFP`** (Identifier): A 4-character label that groups related shares together.
+- **`L0VE`** (Identifier): A self-chosen 4-character label that groups related shares together.
 - **`A`** (Index): Identifies which specific share this is (e.g., Share A, Share C, or `S` for the Master Secret).
 - **The Payload**: The actual secret data.
 - **The Checksum**: The final characters, mathematically derived from the rest of the string to detect errors.
@@ -66,7 +68,7 @@ Typing 48 characters with a joystick can be tedious. We engineered a specific QR
 
 ### 4.3. Multi-Share Collection Mode
 If a user inputs a split share (e.g., Share A of a 2-of-3 set), the SeedSigner intelligently enters a "Collection Mode." 
-- It notes the share identifier (`WSFP`) and the threshold (`k=2`).
+- It notes the share identifier (`L0VE`) and the threshold (`k=2`).
 - It prompts the user to enter or scan the next required share.
 - If a user tries to scan a share from a *different* set, the device catches the mismatch and alerts the user.
 - Once the threshold is met (e.g., Share A and Share C are entered), SeedSigner performs the Codex32 interpolation math to automatically recover the Master Secret (`S` share).
